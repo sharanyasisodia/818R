@@ -1,0 +1,26 @@
+version: '3.8'
+services:
+  backend:
+    build: ./doctor-office-backend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongo
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/appointments
+    command: "npm start"
+    restart: always   # Adding restart policy for backend
+  frontend:
+    build: ./doctor-office-frontend
+    ports:
+      - "3001:3001"
+    depends_on:
+      - backend
+    environment:
+      - PORT=3001
+    restart: always
+  mongo:
+    image: mongo
+    ports:
+      - "27017:27017"
+    restart: always  # Adding restart policy for MongoDB
