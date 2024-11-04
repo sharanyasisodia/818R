@@ -1,0 +1,92 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # Step 2: Backend - Set up Node.js, install dependencies, and run tests
+      - name: Set up Node.js for Backend
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+
+      - name: Install Backend Dependencies
+        run: npm install
+        working-directory: ./doctor-office-backend
+
+      - name: Install Backend Test Dependencies
+        run: npm install jest supertest mongoose
+        working-directory: ./doctor-office-backend
+
+      - name: Run Backend Tests
+        run: npm run test
+        working-directory: ./doctor-office-backend
+
+      # Step 3: Frontend - Set up Node.js, install dependencies, and run tests
+      - name: Set up Node.js for Frontend
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - name: Install Frontend Dependencies
+        run: npm install
+        working-directory: ./doctor-office-frontend
+
+      - name: Run Frontend Tests
+        run: npm run test
+        working-directory: ./doctor-office-frontend
+
+      # Step 4: Docker Login to Amazon ECR
+      - name: Log in to Amazon ECR
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin 588738610761.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+      # Step 5: Build and push Docker images for backend
+      - name: Build and Push Backend Docker Image
+        run: |
+          docker build -t doctor-office-backend:latest ./doctor-office-backend
+          docker tag doctor-office-backend:latest 588738610761.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/sharanya-group:backend-latest
+          docker push 588738610761.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/sharanya-group:backend-latest
+
+      # Step 6: Build and push Docker images for frontend
+      - name: Build and Push Frontend Docker Image
+        run: |
+          docker build -t doctor-office-frontend:latest ./doctor-office-frontend
+          docker tag doctor-office-frontend:latest 588738610761.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/sharanya-group:frontend-latest
+          docker push 588738610761.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/sharanya-group:frontend-latest
+
+      # Step 7: Deploy to EKS
+      - name: Configure kubectl
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          aws eks update-kubeconfig --region $AWS_REGION --name doctor-appointment
+
+      - name: Apply Kubernetes Configurations
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+          aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+          aws configure set region $AWS_REGION
+          kubectl apply -f k8s/backend-deployment.yaml
+          kubectl apply -f k8s/frontend-deployment.yaml
+          kubectl apply -f k8s/ingress.yaml

@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: 588738610761.dkr.ecr.us-east-2.amazonaws.com/sharanya-group:frontend.v2
+        image: 588738610761.dkr.ecr.us-east-2.amazonaws.com/sharanya-group:frontend-latest
         ports:
         - containerPort: 3001
         env:
