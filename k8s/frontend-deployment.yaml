@@ -29,7 +29,7 @@ spec:
   selector:
     app: frontend
   ports:
-    - protocol: HTTP
+    - protocol: TCP
       port: 80
       targetPort: 3001
   type: LoadBalancer
